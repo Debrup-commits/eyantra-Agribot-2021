@@ -1,15 +1,15 @@
 <?xml version="1.0" ?>
 <launch>
-  <node name = "node_turtle_revolve" pkg='task0' type='node_turtle_revolve.py'/>
+  <node name = "AB_1265" pkg='task0' type='AB_1265.py'/>
   <node name = "turtlesim_node" pkg="turtlesim" type="turtlesim_node" respawn="true"/>
   <arg name="record" default="false"/>
   <arg name="duration" default="20"/>
-  <arg name="rec_name" default="turtle_record.bag"/>
+  <arg name="rec_name" default="AB_1265.bag"/>
 
   <group if="$(arg record)">
 
        <node name="rosbag_record_turtle" pkg="rosbag" type="record"
-       args="record -O $(find pkg_task0)/bag_files/$(arg rec_name) --duration=$(arg duration) --chunksize=10 /turtle1/cmd_vel /turtle1/pose" output="screen"/>
+       args="record -O $(find task0)/bag_files/$(arg rec_name) --duration=$(arg duration) --chunksize=10 /turtle1/cmd_vel /turtle1/pose" output="screen"/>
 
   </group>
 </launch>
