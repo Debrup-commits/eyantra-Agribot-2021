@@ -31,14 +31,14 @@ class Revolve:
                 self.vel.linear.x = 3
                 self.vel.angular.z = -3
 
-                if 0 < a < 0.07:
+                if 0 < a < 0.05:
                     self.bot_pose +=1
 
             if self.bot_pose == 1:
                 self.vel.linear.x = 3
                 self.vel.angular.z = 3
 
-                if -0.07 < a < 0:
+                if -0.05 < a < 0:
                     self.bot_pose += 1
 
             if self.bot_pose == 2:

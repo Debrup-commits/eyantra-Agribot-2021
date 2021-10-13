@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
-  <node name = "node_turtle_revolve" pkg='pkg_task0' type='node_turtle_revolve.py'/>
+  <node name = "node_turtle_revolve" pkg='task0' type='node_turtle_revolve.py'/>
   <node name = "turtlesim_node" pkg="turtlesim" type="turtlesim_node" respawn="true"/>
   <arg name="record" default="false"/>
   <arg name="duration" default="20"/>
