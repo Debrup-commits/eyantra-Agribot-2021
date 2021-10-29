@@ -19,18 +19,12 @@ def control_loop():
     pose_msg = Odometry()
     laser_msg = LaserScan()
 
-    global pose, regions
-
-
     velocity_msg.linear.x = 0
     velocity_msg.angular.z = 0
     pub.publish(velocity_msg)
 
     while not rospy.is_shutdown():
 
-        # print("right: ", regions['fright'])
-        # print("front: ", globals['regions']['front'])
-        # print("left: ", globals['regions']['fleft'])
         #
         # Your algorithm to complete the obstacle course
         #
@@ -52,14 +46,14 @@ def odom_callback(data):
 def laser_callback(msg):
     global regions
     regions = {
-        # 'bright': msg.ranges[0]  ,
-        'fright': min(min(msg.ranges[0:240]), msg.range_max)  ,
-        'front':  min(min(msg.ranges[240:480]), msg.range_max)  ,
-        'fleft':  min(min(msg.ranges[480:720]), msg.range_max)  ,
-        # 'bleft':  msg.ranges[269]  ,
+        'bright': min(min(msg.ranges[0:144]), msg.range_max),
+        'fright': min(min(msg.ranges[144:288]), msg.range_max),
+        'front':  min(min(msg.ranges[288:432]), msg.range_max),
+        'fleft':  min(min(msg.ranges[432:576]), msg.range_max),
+        'bleft':  min(min(msg.ranges[576:720]), msg.range_max),
     }
 
-    rospy.loginfo(regions)
+    # rospy.loginfo(regions)
 
 
 if __name__ == '__main__':
