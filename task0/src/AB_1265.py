@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 
+#Importing all important libraries
+
 import rospy
 from geometry_msgs.msg import Twist
 from turtlesim.msg import Pose
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-import sys
 
 class Revolve:
     def __init__(self):
         rospy.init_node('turtlesim_revolver')
 
+        #Subscriber, Publisher
         self.sub = rospy.Subscriber('/turtle1/pose', Pose, self.callback)
         self.pub = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size = 10)
 
+        #Determines rate of publishing on the publisher node
         self.rate = rospy.Rate(10)
 
         self.bot_pose = 0
@@ -27,6 +30,7 @@ class Revolve:
             self.pose = data
             a = self.pose.theta
 
+            #logic
             if self.bot_pose == 0:
                 self.vel.linear.x = 3
                 self.vel.angular.z = -3
@@ -45,6 +49,7 @@ class Revolve:
                 self.vel.linear.x = 0
                 self.vel.angular.z = 0
 
+            #Publishing the messages
             self.pub.publish(self.vel)
 
             if self.bot_pose < 2:
@@ -52,9 +57,6 @@ class Revolve:
             else:
                 rospy.loginfo("Target reached")
                 rospy.signal_shutdown("Task 0 completed")
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                rospy.signal_shutdown("user command")
 
         except CvBridgeError as e:
             print(e)
