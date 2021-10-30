@@ -6,58 +6,55 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 
-def control_loop():
-    rospy.init_node('ebot_controller')
+class Controller:
+    def __init__(self):
+        rospy.init_node('ebot_controller')
 
-    pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-    rospy.Subscriber('/ebot/laser/scan', LaserScan, laser_callback)
-    rospy.Subscriber('/odom', Odometry, odom_callback)
+        self.regions = {}
+        self.pose = []
 
-    rate = rospy.Rate(10)
+        self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
-    velocity_msg = Twist()
-    pose_msg = Odometry()
-    laser_msg = LaserScan()
+        rospy.Subscriber('/ebot/laser/scan', LaserScan, self.laser_callback)
+        rospy.Subscriber('/odom', Odometry, self.odom_callback)
 
-    velocity_msg.linear.x = 0
-    velocity_msg.angular.z = 0
-    pub.publish(velocity_msg)
+        self.rate = rospy.Rate(10)
 
-    while not rospy.is_shutdown():
+        self.velocity_msg = Twist()
 
-        #
-        # Your algorithm to complete the obstacle course
-        #
+        self.velocity_msg.linear.x = 0
+        self.velocity_msg.angular.z = 0
+        self.pub.publish(self.velocity_msg)
 
-        # velocity_msg.linear.x =
-        # velocity_msg.angular.z =
-        pub.publish(velocity_msg)
-        print("Controller message pushed at {}".format(rospy.get_time()))
-        rate.sleep()
+        while not rospy.is_shutdown():
+            print(self.pose)
+            # if self.pose[2] != 3.14:
+            #     self.velocity_msg.angular.z = 1
 
-def odom_callback(data):
-    global pose
-    x  = data.pose.pose.orientation.x;
-    y  = data.pose.pose.orientation.y;
-    z = data.pose.pose.orientation.z;
-    w = data.pose.pose.orientation.w;
-    pose = [data.pose.pose.position.x, data.pose.pose.position.y, euler_from_quaternion([x,y,z,w])[2]]
+            self.pub.publish(self.velocity_msg)
+            print("Controller message pushed at {}".format(rospy.get_time()))
+            self.rate.sleep()
 
-def laser_callback(msg):
-    global regions
-    regions = {
-        'bright': min(min(msg.ranges[0:144]), msg.range_max),
-        'fright': min(min(msg.ranges[144:288]), msg.range_max),
-        'front':  min(min(msg.ranges[288:432]), msg.range_max),
-        'fleft':  min(min(msg.ranges[432:576]), msg.range_max),
-        'bleft':  min(min(msg.ranges[576:720]), msg.range_max),
-    }
+    def odom_callback(self, data):
+        x  = data.pose.pose.orientation.x;
+        y  = data.pose.pose.orientation.y;
+        z = data.pose.pose.orientation.z;
+        w = data.pose.pose.orientation.w;
+        self.pose = [data.pose.pose.position.x, data.pose.pose.position.y, euler_from_quaternion([x,y,z,w])[2]]
 
-    # rospy.loginfo(regions)
-
+    def laser_callback(self, msg):
+        self.regions = {
+            'bright': min(min(msg.ranges[0:144]), msg.range_max),
+            'fright': min(min(msg.ranges[144:288]), msg.range_max),
+            'front':  min(min(msg.ranges[288:432]), msg.range_max),
+            'fleft':  min(min(msg.ranges[432:576]), msg.range_max),
+            'bleft':  min(min(msg.ranges[576:720]), msg.range_max),
+        }
 
 if __name__ == '__main__':
+    ct = Controller()
     try:
-        control_loop()
-    except rospy.ROSInterruptException:
-        pass
+        if not rospy.is_shutdown():
+            rospy.spin()
+    except rospy.ROSInterruptException as e:
+        print(e)
