@@ -21,11 +21,10 @@ class Controller:
         self.y = 0
         self.theta = 0
 
-        self.count_lt1 = 0
-        self.count_mt1 = 0
+        self.stage = 0
 
         self.intg, self.last_error = 0.0, 0.0
-        self.params = {'KP': 2, 'KD': 3, 'KI': 0, 'SP': 0.5}
+        self.params = {'KP': 4, 'KD': 2, 'KI': 0}
 
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
@@ -36,31 +35,28 @@ class Controller:
 
         self.velocity_msg = Twist()
 
-        self.velocity_msg.linear.x = 0
-        self.velocity_msg.angular.z = 0
         self.pub.publish(self.velocity_msg)
 
         while not rospy.is_shutdown():
-            print("left value: ", self.fleft)
-            print("right value: ", self.fright)
-
-            # self.rotate(3.14, 1)
-            self.followTubs()
+            if self.stage == 0:
+                self.rotate(3.14, 1)
+            if self.stage == 1:
+                self.orient(2.2, 0.5, -0.5)
+            if self.stage == 2:
+                self.rotate(1.57, -1)
             self.pub.publish(self.velocity_msg)
-            # print("Controller message pushed at {}".format(rospy.get_time()))
+            if self.stage == 3:
+                self.followTroughs(1)
+            if self.stage == 4:
+                self.orient(-1.57, 0.5, -2.1)
+            if self.stage == 5:
+                self.followTroughs(1)
+            if self.stage == 6:
+                self.orient(1.57, 0.5, 1.3)
+            if self.stage == 7:
+                self.followTroughs(1)
+
             self.rate.sleep()
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            self.velocity_msg.linear.x = 0
-            self.velocity_msg.angular.z = 0
-            rospy.signal_shutdown("user command")
-
-    def rotate(self, final_orientation, angular_vel):
-
-        if abs(abs(self.theta)-abs(final_orientation)) > 0.1:
-            self.velocity_msg.angular.z = angular_vel
-        else:
-            self.velocity_msg.angular.z = 0
 
     def pid(self, error, const):
         prop = error
@@ -70,45 +66,55 @@ class Controller:
         self.last_error = error
         return balance
 
-    def followTubs(self):
-        if self.fright < 1 and self.fleft > 1:
-            error = 0.6-self.fright
+    def stop(self):
+        self.velocity_msg.linear.x = 0
+        self.velocity_msg.angular.z = 0
+
+    def rotate(self, final_orientation, angular_vel):
+
+        if abs(self.theta-final_orientation) > 0.1:
+            self.velocity_msg.angular.z = angular_vel
+        else:
+            self.velocity_msg.angular.z = 0
+            self.stage += 1
+
+    def orient(self, final_orientation, linear_vel, angular_vel):
+        if abs(self.theta - final_orientation) > 0.1:
+            self.velocity_msg.linear.x = linear_vel
+            self.velocity_msg.angular.z = angular_vel
+        else:
+            self.stop()
+            self.stage += 1
+
+    def followTroughs(self, linear_vel):
+        if self.bright < 1 and self.bleft > 1:
+            error = 0.58-self.bright
             angular_vel = self.pid(error, self.params)
 
-            self.velocity_msg.linear.x = 0.5
+            self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
 
-        if self.fleft < 1 and self.fright > 1:
-            error = 0.6-self.fleft
+        if self.bleft < 1 and self.bright > 1:
+            error = 0.58-self.bleft
             angular_vel = self.pid(error, self.params)
 
-            self.velocity_msg.linear.x = 0.5
+            self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = -angular_vel
 
-        if self.fleft < 1 and self.fright < 1:
+        if self.bleft < 1 and self.bright < 1:
 
-            # if self.count_lt1 == 0:
-            #     self.velocity_msg.angular.z = 0.5
-            #
-            # if self.count_lt1 == 2:
-            error = self.fleft-self.fright
+            error = self.bleft-self.bright
             angular_vel = self.pid(error, self.params)
 
-            self.velocity_msg.linear.x = 0.5
+            self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
 
-        if self.fleft > 1 and self.fright > 1:
-            # self.velocity_msg.linear.x = 0
-            # self.velocity_msg.angular.z = 0
-            # if 1.55 < abs(self.theta) < 1.59:
-            #     self.count_mt1 +=1
-            #     if self.count_mt1 == 1:
-            self.velocity_msg.angular.z = -5
-            #     if self.count_mt1 == 2:
-            #         rospy.loginfo("Task completed")
-            #         rospy.signal_shutdown("Task completed")
-            # else:
-            #     self.velocity_msg.angular.z = 1
+        if self.bleft > 1 and self.bright > 1:
+            self.stop()
+            if self.stage == 7:
+                print("Task completed")
+            if self.stage < 8:
+                self.stage += 1
 
     def odom_callback(self, data):
         x  = data.pose.pose.orientation.x;
