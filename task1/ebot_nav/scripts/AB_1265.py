@@ -138,11 +138,11 @@ class Controller:
         self.theta = euler_from_quaternion([x,y,z,w])[2] #real time orientation of bot
 
     def laser_callback(self, msg):
-        self.bright = min(min(msg.ranges[0:144]), msg.range_max) #distance of the closest object in the back right region
-        self.fright = min(min(msg.ranges[144:288]), msg.range_max) #distance of the closest object in the front right region
-        self.front = min(min(msg.ranges[288:432]), msg.range_max) #distance of the closest object in the front region
-        self.fleft = min(min(msg.ranges[432:576]), msg.range_max) #distance of the closest object in the front left region
-        self.bleft = min(min(msg.ranges[576:720]), msg.range_max) #distance of the closest object in the back lrft region
+        self.bright = min(min(msg.ranges[0:144]), msg.range_max)    # distance of the closest object in the back right region
+        self.fright = min(min(msg.ranges[144:288]), msg.range_max)  # distance of the closest object in the front right region
+        self.front = min(min(msg.ranges[288:432]), msg.range_max)   # distance of the closest object in the front region
+        self.fleft = min(min(msg.ranges[432:576]), msg.range_max)   # distance of the closest object in the front left region
+        self.bleft = min(min(msg.ranges[576:720]), msg.range_max)   # distance of the closest object in the back lrft region
 
 if __name__ == '__main__':
     ct = Controller()

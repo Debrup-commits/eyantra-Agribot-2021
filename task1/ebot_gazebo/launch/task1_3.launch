@@ -14,7 +14,7 @@
 	<!-- load tomato plant with greenhouse model -->
 	<include file="$(find tomato_gazebo)/launch/wall_follow.launch"/>
 
-	<node name = "AB_1265" pkg='ebot_nav' type='AB_1265.py'/>
+	<node name = "AB_1265" pkg='ebot_nav' type='AB_1265.py' output="screen"/>
 
 
 	<!--  -->
