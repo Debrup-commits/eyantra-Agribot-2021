@@ -55,7 +55,6 @@ class Controller:
                 self.orient(2.2, 0.5, -0.5)
             if self.stage == 2:
                 self.rotate(1.57, -1)
-            self.pub.publish(self.velocity_msg)
             if self.stage == 3:
                 self.followTroughs(1)
             if self.stage == 4:
@@ -69,7 +68,10 @@ class Controller:
             if self.stage == 8:
                 self.stop()
                 self.pub.publish(self.velocity_msg)
+                rospy.loginfo("Task completed")
                 rospy.signal_shutdown("Task 1 finished")
+
+            self.pub.publish(self.velocity_msg)
 
     def pid(self, error, const):
         prop = error
