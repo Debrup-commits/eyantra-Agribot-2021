@@ -89,16 +89,22 @@ class Controller:
 
         if abs(self.theta-final_orientation) > 0.1:
             self.velocity_msg.angular.z = angular_vel
+
+            print("Rotating...current orientation: ", self.theta)
         else:
             self.velocity_msg.angular.z = 0
+            print("Target orientation achieved!")
             self.stage += 1
 
     def orient(self, final_orientation, linear_vel, angular_vel):
         if abs(self.theta - final_orientation) > 0.1:
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
+
+            print("Orienting...current orientation: ", self.theta)
         else:
             self.stop()
+            print("Target orientation achieved!")
             self.stage += 1
 
     def followTroughs(self, linear_vel):
@@ -109,12 +115,16 @@ class Controller:
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
 
+            print("Following troughs...distance from trough row: ", self.bright)
+
         if self.bleft < 1 and self.bright > 1:
             error = 0.58-self.bleft
             angular_vel = self.pid(error, self.params)
 
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = -angular_vel
+
+            print("Following troughs...distance from trough row: ", self.bleft)
 
         if self.bleft < 1 and self.bright < 1:
 
@@ -123,6 +133,8 @@ class Controller:
 
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
+
+            print("Troughs on both sides...distance from left & right row respectively: ", self.bleft, self.bright)
 
         if self.bleft > 1 and self.bright > 1:
             self.stop()
