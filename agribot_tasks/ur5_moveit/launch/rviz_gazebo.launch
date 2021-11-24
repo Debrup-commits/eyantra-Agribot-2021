@@ -1,0 +1,13 @@
+<launch>
+  <include file = "$(find ebot_gazebo)/launch/task2.launch"/>
+  <include file = "$(find ur5_moveit)/launch/ur5_bringup_moveit.launch"/>
+  <!-- <include file="$(find ur5_moveit)/launch/move_group.launch"/>
+  <arg name = "use_rviz" default = "true"/>
+  <include file="$(find ur5_moveit)/launch/moveit_rviz.launch" if = "$(arg use_rviz)">
+    <arg name="rviz_config" value="$(find ur5_moveit)/launch/moveit.rviz"/>
+  </include> -->
+
+  <arg name="scene_file" default="$(find ur5_moveit)/config/rviz/scene_with_tomato.scene"/> 
+  <node name = "moveit_publish_scene_from_text" pkg= "moveit_ros_planning" type = "moveit_publish_scene_from_text" args= "$(arg scene_file)"/>
+
+</launch>
