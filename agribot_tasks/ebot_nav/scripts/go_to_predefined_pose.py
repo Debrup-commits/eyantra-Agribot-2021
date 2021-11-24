@@ -90,8 +90,14 @@ def main():
         ur5.go_to_predefined_pose("home")
         ur5.go_to_predefined_pose("open")
 
-    del ur5
+        ur5.go_to_predefined_pose("go_to_tomato3")
+        ur5.go_to_predefined_pose("close")
+        ur5.go_to_predefined_pose("home")
+        ur5.go_to_predefined_pose("open")
 
+        del ur5
+
+        rospy.signal_shutdown("Task completed")
 
 if __name__ == '__main__':
     main()

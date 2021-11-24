@@ -114,8 +114,8 @@ def main():
     ur5 = Ur5Moveit()
 
     ur5_pose_1 = geometry_msgs.msg.Pose()
-    ur5_pose_1.position.x = 0.250936364559653
-    ur5_pose_1.position.y = 0.10935813860877695
+    ur5_pose_1.position.x = -0.0665751
+    ur5_pose_1.position.y = 0.273677
     ur5_pose_1.position.z = 0.670607
 
     # ur5_pose_2 = geometry_msgs.msg.Pose()
