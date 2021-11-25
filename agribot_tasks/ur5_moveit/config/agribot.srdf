@@ -48,8 +48,8 @@
         <joint name="shoulder_lift_joint" value="-0.0203324"/>
         <joint name="shoulder_pan_joint" value="-0.2679"/>
         <joint name="wrist_1_joint" value="1.73742"/>
-        <joint name="wrist_2_joint" value="-1.83874"/>
-        <joint name="wrist_3_joint" value="-3.14086"/>
+        <joint name="wrist_2_joint" value="-1.8387"/>
+        <joint name="wrist_3_joint" value="0"/>
     </group_state>
     <group_state name="go_to_tomato2" group="arm">
         <joint name="elbow_joint" value="-0.3014"/>
@@ -57,7 +57,7 @@
         <joint name="shoulder_pan_joint" value="1.41606"/>
         <joint name="wrist_1_joint" value="2.5985"/>
         <joint name="wrist_2_joint" value="3.2955"/>
-        <joint name="wrist_3_joint" value="0.0007"/>
+        <joint name="wrist_3_joint" value="3.1408"/>
     </group_state>
     <group_state name="go_to_tomato3" group="arm">
         <joint name="elbow_joint" value="-0.1464"/>
@@ -65,7 +65,7 @@
         <joint name="shoulder_pan_joint" value="1.9499"/>
         <joint name="wrist_1_joint" value="5.5061"/>
         <joint name="wrist_2_joint" value="-5.9032"/>
-        <joint name="wrist_3_joint" value="-3.1409"/>
+        <joint name="wrist_3_joint" value="0"/>
     </group_state>
     <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
     <end_effector name="gripper" parent_link="wrist_3_link" group="gripper" parent_group="arm"/>

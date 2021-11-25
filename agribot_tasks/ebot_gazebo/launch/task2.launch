@@ -31,7 +31,7 @@
 
 
   <!-- Recording group -->
-  <arg name="duration" default="120"/>
+  <arg name="duration" default="300"/>
   <arg name="rec_name" default="task2.bag"/>
   <arg name="record" default="false"/>
   <group if="$(arg record)">
