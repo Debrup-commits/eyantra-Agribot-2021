@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 
-<robot name="ebot"
+<robot name="ebot" 
   xmlns:xacro="http://www.ros.org/wiki/xacro">
   <gazebo>
     <plugin name="skid_steer_drive_controller" filename="libgazebo_ros_skid_steer_drive.so">
       <updateRate>20.0</updateRate>
-      <leftFrontJoint>FWLJ</leftFrontJoint>
+      <leftFrontJoint>FWLJ</leftFrontJoint>  
       <rightFrontJoint>FWRJ</rightFrontJoint>
       <leftRearJoint>RWLJ</leftRearJoint>
       <rightRearJoint>RWRJ</rightRearJoint>
@@ -14,11 +14,11 @@
       <robotBaseFrame>ebot_base</robotBaseFrame>
       <torque>100</torque>
       <topicName>cmd_vel</topicName>
-
+      
       <commandTopic>cmd_vel</commandTopic>
       <odometryTopic>odom</odometryTopic>
       <odometryFrame>odom</odometryFrame>
-
+      
       <broadcastTF>true</broadcastTF>
    </plugin>
   </gazebo>
@@ -70,7 +70,7 @@
 	    <kd>1.0</kd>
 	<maxVel>0.0</maxVel>
 	<minDepth>0.001</minDepth>
-	</gazebo>
+	</gazebo> 
 
 	<gazebo reference="tomato_gripper_l">
 	    <implicitSpringDamper>1</implicitSpringDamper>
@@ -80,7 +80,7 @@
 	    <kd>1.0</kd>
 	<maxVel>0.0</maxVel>
 	<minDepth>0.001</minDepth>
-	</gazebo>
+	</gazebo> 
 
 
 
@@ -118,7 +118,7 @@
         </range>
         <noise>
           <type>gaussian</type>
-
+          
           <mean>0.0</mean>
           <stddev>0.01</stddev>
         </noise>
@@ -161,7 +161,7 @@
         <frameName>laser</frameName>
       </plugin>
     </sensor>
-  </gazebo>
+  </gazebo> 
 
 
 <!-- intel realsense1 -->
@@ -216,7 +216,7 @@
 
 
 <!-- xacro for ultrasonic sensor using GPU -->
-<!--
+<!-- 
 <xacro:macro name="ultrasonic_sensor" params="name">
     <gazebo reference="${name}">
     <sensor type="gpu_ray" name="${name}">
@@ -239,7 +239,7 @@
         </range>
         <noise>
           <type>gaussian</type>
-
+          
           <mean>0.0</mean>
           <stddev>0.01</stddev>
         </noise>
@@ -286,18 +286,18 @@
         <frameName>${name}_ultrasonic_sensor</frameName>
       </plugin>
     </sensor>
-  </gazebo>
-  </xacro:macro>
+  </gazebo> 
+  </xacro:macro> 
 
-<xacro:ultrasonic_sensor name="FUS1"/>
-<xacro:ultrasonic_sensor name="FUS2"/>
-<xacro:ultrasonic_sensor name="FUS3"/>
-<xacro:ultrasonic_sensor name="FUS4"/>
-<xacro:ultrasonic_sensor name="RUS5"/>
-<xacro:ultrasonic_sensor name="RUS6"/>
-<xacro:ultrasonic_sensor name="RHUS7"/>
-<xacro:ultrasonic_sensor name="RHUS9"/>
-<xacro:ultrasonic_sensor name="LHUS9"/>
+<xacro:ultrasonic_sensor name="FUS1"/> 
+<xacro:ultrasonic_sensor name="FUS2"/> 
+<xacro:ultrasonic_sensor name="FUS3"/> 
+<xacro:ultrasonic_sensor name="FUS4"/> 
+<xacro:ultrasonic_sensor name="RUS5"/> 
+<xacro:ultrasonic_sensor name="RUS6"/> 
+<xacro:ultrasonic_sensor name="RHUS7"/> 
+<xacro:ultrasonic_sensor name="RHUS9"/> 
+<xacro:ultrasonic_sensor name="LHUS9"/> 
 <xacro:ultrasonic_sensor name="LHUS10"/> -->
 
 <!-- imu -->
