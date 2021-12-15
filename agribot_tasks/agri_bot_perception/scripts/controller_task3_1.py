@@ -8,6 +8,7 @@ from geometry_msgs.msg import Twist
 import moveit_commander
 import moveit_msgs.msg
 from nav_msgs.msg import Odometry
+import numpy as np
 import roslib
 import rospy
 from sensor_msgs.msg import Image
@@ -54,21 +55,10 @@ class Controller:
         #group names
         self._group_names = self._robot.get_group_names()
 
-        # rospy.loginfo(
-        #     '\033[94m' + "Planning Group 1: {}".format(self._planning_frame_1) + '\033[0m')
-        # rospy.loginfo(
-        #     '\033[94m' + "End Effector Link 1: {}".format(self._eef_link_1) + '\033[0m')
-        # rospy.loginfo(
-        #     '\033[94m' + "Planning Group 2: {}".format(self._planning_frame_2) + '\033[0m')
-        # rospy.loginfo(
-        #     '\033[94m' + "End Effector Link 2: {}".format(self._eef_link_2) + '\033[0m')
-        # rospy.loginfo(
-        #     '\033[94m' + "Group Names: {}".format(self._group_names) + '\033[0m')
-        #
-        # rospy.loginfo('\033[94m' + " >>> Ur5Moveit init done." + '\033[0m')
-
         #camera feed
         self.image_sub = rospy.Subscriber("/camera/color/image_raw2", Image, self.image_callback)
+        self.image_sub_depth = rospy.Subscriber("/camera/depth/image_raw2", Image, self.depth_callback)
+
 
         #Bot movement stuff
         #Parameters for laser scanning
@@ -114,13 +104,13 @@ class Controller:
                 moveit_commander.roscpp_shutdown()
                 self.rotate(0, -1)
             if self.stage == 1:
-                self.orient(0.94, 0.75, 0.5)
+                self.orient(0.94, 1, 0.48)
             if self.stage == 2:
                 self.rotate(1.57, 1)
             if self.stage == 3:
                 self.followTroughs(1)
             if self.stage == 4:
-                self.orient(-1.57, 0.9, 1)
+                self.orient(-1.57, 1.5, 1)
             if self.stage == 5:
                 self.followTroughs(1)
             if self.stage == 6:
@@ -231,96 +221,60 @@ class Controller:
         self.bleft = min(min(msg.ranges[576:720]), msg.range_max)   # distance of the closest object in the back lrft region
 
     def image_callback(self, data):
+
         # Initializing variables
-        global cv_image
         focal_length = 554.387
         center_x = 320.5
         center_y = 240.5
-        aruco_dimension = 0.1
+
         try:
             bridge = CvBridge()
             frame = bridge.imgmsg_to_cv2(data, "bgr8")
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img_HSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-            # # load the dictionary that was used to generate the markers
-            # dictionary = cv.aruco.Dictionary_get(cv.aruco.DICT_7X7_1000)
-            #
-            # # initializing the detector parameters with default values
-            # parameters =  cv.aruco.DetectorParameters_create()
-            #
-            # # detect the markers in the frame
-            # corners, ids, rejectedCandidates = cv.aruco.detectMarkers(frame, dictionary, parameters=parameters)
-            #
-            # if len(corners) > 0:
-            #     # Flatten the ArUco IDs list
-            #     ids = ids.flatten()
-            #     # loop over the detected ArUCo corners
-            #     for (markerCorner, markerID) in zip(corners, ids):
-            #         # extract the marker corners (which are always returned
-            #         # in top-left, top-right, bottom-right, and bottom-left
-            #         # order)
-            #         corners = markerCorner.reshape((4, 2))
-            #         (topLeft, topRight, bottomRight, bottomLeft) = corners
-            #         # convert each of the (x, y)-coordinate pairs to integers
-            #         topRight = (int(topRight[0]), int(topRight[1]))
-            #         bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
-            #         bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
-            #         topLeft = (int(topLeft[0]), int(topLeft[1]))
-            #
-            #         # draw the bounding box of the ArUCo detection
-            #         cv.line(frame, topLeft, topRight, (0, 255, 0), 2)
-            #         cv.line(frame, topRight, bottomRight, (0, 255, 0), 2)
-            #         cv.line(frame, bottomRight, bottomLeft, (0, 255, 0), 2)
-            #         cv.line(frame, bottomLeft, topLeft, (0, 255, 0), 2)
-            #         # compute and draw the center (x, y)-coordinates of the ArUco
-            #         # marker
-            #         cX = int((topLeft[0] + bottomRight[0]) / 2.0)
-            #         cY = int((topLeft[1] + bottomRight[1]) / 2.0)
-            #         cv.circle(frame, (cX, cY), 4, (0, 0, 255), -1)
-            #
-            #         pixel_width = topLeft[1] - bottomRight[1]
-            #
-            #         # draw the ArUco marker ID on the frame
-            #         cv.putText(frame, str(markerID),
-            #             (topLeft[0], topLeft[1] - 15), cv.FONT_HERSHEY_SIMPLEX,
-            #             0.5, (0, 255, 0), 2)
-            #
-            #         '''uncomment to view aruco ID and verify the working of the code'''
-            #         #print("[INFO] ArUco marker ID: {}".format(markerID))
-            #
-            #         # obtain depth for each ArUco marker
-            #         distance = (focal_length*aruco_dimension)/pixel_width
-            #
-            #         # transforming pixel coordinates to world coordinates
-            #         world_x = (cX - center_x)/focal_length*distance
-            #         world_y = (cY - center_y)/focal_length*distance
-            #         world_z = distance
-            #
-            #         # broadcasting TF for each aruco marker
-            #         br = tf2_ros.TransformBroadcaster()
-            #         t = geometry_msgs.msg.TransformStamped()
-            #         t.header.stamp = rospy.Time.now()
-            #         t.header.frame_id = "sjcam_link"
-            #         t.child_frame_id = "aruco"+str(markerID)
-            #
-            #         # putting world coordinates coordinates as viewed for sjcam frame
-            #         t.transform.translation.x = world_z
-            #         t.transform.translation.y = -world_x
-            #         t.transform.translation.z = world_y
-            #         # not extracting any orientation thus orientation is (0, 0, 0)
-            #         q = tf_conversions.transformations.quaternion_from_euler(0, 0, 0)
-            #         t.transform.rotation.x = q[0]
-            #         t.transform.rotation.y = q[1]
-            #         t.transform.rotation.z = q[2]
-            #         t.transform.rotation.w = q[3]
-            #
-            #         br.sendTransform(t)
+            low_HSV = np.array([0, 53, 137])
+            upper_HSV = np.array([10, 255, 255])
 
-            '''uncoment to view the visual of detection'''
-            cv2.imshow("frame", frame)
+            mask = cv2.inRange(img_HSV, low_HSV, upper_HSV)
+            output = cv2.bitwise_and(frame, frame, mask = mask)
+            output = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+
+            ret, threshold = cv2.threshold(output, 25, 255, cv2.THRESH_BINARY)
+
+            contours, hierarchy = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            # cv2.drawContours(frame, contours, -1, (255, 255, 255), 2)
+
+            i=1
+
+            for contour in contours:
+                C = cv2.moments(contour)
+
+                cX = int(C['m10']/(C['m00']+1e-4))
+                cY = int(C['m01']/(C['m00']+1e-4))
+
+                cv2.putText(frame, 'obj{}'.format(i),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                cv2.circle(frame, (cX, cY), 2, (255, 255, 255), -1)
+
+                i+=1
+
+            cv2.imshow("frame", threshold)
+            cv2.imshow("frame_2", frame)
             cv2.waitKey(1)
+
         except CvBridgeError as e:
             print(e)
+
+    def depth_callback(self, data):
+        try:
+            bridge = CvBridge()
+            depth_frame = bridge.imgmsg_to_cv2(data, "32FC1")
+            cv2.imshow("depth_frame", depth_frame)
+            cv2.waitKey(1)
+
+        except CvBridgeError as e:
+            print(e)
+
+
 
 if __name__ == '__main__':
     ct = Controller()
