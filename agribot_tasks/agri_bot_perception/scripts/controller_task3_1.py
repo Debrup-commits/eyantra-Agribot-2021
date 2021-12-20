@@ -8,10 +8,11 @@ from geometry_msgs.msg import Twist
 import moveit_commander
 import moveit_msgs.msg
 from nav_msgs.msg import Odometry
+import message_filters
 import numpy as np
 import roslib
 import rospy
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from sensor_msgs.msg import LaserScan
 import sys
 import tf2_ros
@@ -56,9 +57,14 @@ class Controller:
         self._group_names = self._robot.get_group_names()
 
         #camera feed
-        self.image_sub = rospy.Subscriber("/camera/color/image_raw2", Image, self.image_callback)
-        self.image_sub_depth = rospy.Subscriber("/camera/depth/image_raw2", Image, self.depth_callback)
+        self.camera_info_sub = message_filters.Subscriber('/camera/color/camera_info2', CameraInfo)
+        self.image_sub = message_filters.Subscriber("/camera/color/image_raw2", Image)
+        self.depth_sub = message_filters.Subscriber("/camera/depth/image_raw2", Image)
 
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.camera_info_sub], queue_size=10, slop=0.5)
+        self.ts.registerCallback(self.image_callback)
+
+        self.bridge = CvBridge()
 
         #Bot movement stuff
         #Parameters for laser scanning
@@ -88,7 +94,7 @@ class Controller:
         rospy.Subscriber('/odom', Odometry, self.odom_callback)
 
         #Rate of publishing
-        self.rate = rospy.Rate(100)
+        self.rate = rospy.Rate(10)
 
         #ROS msg
         self.velocity_msg = Twist()
@@ -100,24 +106,24 @@ class Controller:
             #Algorithm:
 
             if self.stage == 0:
-                self.go_to_predefined_pose("rotate_90")
+                # self.go_to_predefined_pose("rotate_90")
                 moveit_commander.roscpp_shutdown()
                 self.rotate(0, -1)
-            if self.stage == 1:
-                self.orient(0.94, 1, 0.48)
-            if self.stage == 2:
-                self.rotate(1.57, 1)
-            if self.stage == 3:
-                self.followTroughs(1)
-            if self.stage == 4:
-                self.orient(-1.57, 1.5, 1)
-            if self.stage == 5:
-                self.followTroughs(1)
-            if self.stage == 6:
-                self.stop()
-                self.pub.publish(self.velocity_msg)
-                rospy.loginfo("Task completed")
-                rospy.signal_shutdown("Task 3 finished")
+            # if self.stage == 1:
+            #     self.orient(0.94, 1, 0.5)
+            # if self.stage == 2:
+            #     self.rotate(1.57, 1)
+            # if self.stage == 3:
+            #     self.followTroughs(1)
+            # if self.stage == 4:
+            #     self.orient(-1.57, 1.5, 1)
+            # if self.stage == 5:
+            #     self.followTroughs(1)
+            # if self.stage == 6:
+            #     self.stop()
+            #     self.pub.publish(self.velocity_msg)
+            #     rospy.loginfo("Task completed")
+            #     rospy.signal_shutdown("Task 3 finished")
 
             self.pub.publish(self.velocity_msg)
 
@@ -133,7 +139,7 @@ class Controller:
              self._group_1.plan()
              flag_plan = self._group_1.go(wait=True)
 
-        rospy.loginfo('\033[94m' + "Now at Pose: {}".format(arg_pose_name) + '\033[0m')
+        # rospy.loginfo('\033[94m' + "Now at Pose: {}".format(arg_pose_name) + '\033[0m')
 
     def pid(self, error, const):
         prop = error
@@ -220,7 +226,7 @@ class Controller:
         self.fleft = min(min(msg.ranges[432:576]), msg.range_max)   # distance of the closest object in the front left region
         self.bleft = min(min(msg.ranges[576:720]), msg.range_max)   # distance of the closest object in the back lrft region
 
-    def image_callback(self, data):
+    def image_callback(self, rgb_data, depth_data, camera_info):
 
         # Initializing variables
         focal_length = 554.387
@@ -228,8 +234,10 @@ class Controller:
         center_y = 240.5
 
         try:
-            bridge = CvBridge()
-            frame = bridge.imgmsg_to_cv2(data, "bgr8")
+            frame = self.bridge.imgmsg_to_cv2(rgb_data, "bgr8")
+            depth_frame = self.bridge.imgmsg_to_cv2(depth_data, "32FC1")
+            depth_array = np.array(depth_frame, dtype=np.float32)
+
             img_HSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
             low_HSV = np.array([0, 53, 137])
@@ -244,7 +252,7 @@ class Controller:
             contours, hierarchy = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             # cv2.drawContours(frame, contours, -1, (255, 255, 255), 2)
 
-            i=1
+            i=0
 
             for contour in contours:
                 C = cv2.moments(contour)
@@ -254,26 +262,17 @@ class Controller:
 
                 cv2.putText(frame, 'obj{}'.format(i),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                 cv2.circle(frame, (cX, cY), 2, (255, 255, 255), -1)
+                cv2.circle(depth_frame, (cX, cY), 2, (0, 0, 0), -1)
 
                 i+=1
 
-            cv2.imshow("frame", threshold)
+            # cv2.imshow("frame", threshold)
             cv2.imshow("frame_2", frame)
-            cv2.waitKey(1)
-
-        except CvBridgeError as e:
-            print(e)
-
-    def depth_callback(self, data):
-        try:
-            bridge = CvBridge()
-            depth_frame = bridge.imgmsg_to_cv2(data, "32FC1")
             cv2.imshow("depth_frame", depth_frame)
             cv2.waitKey(1)
 
         except CvBridgeError as e:
             print(e)
-
 
 
 if __name__ == '__main__':
