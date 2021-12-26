@@ -5,6 +5,7 @@ import copy
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Twist
+import geometry_msgs.msg
 import moveit_commander
 import moveit_msgs.msg
 from nav_msgs.msg import Odometry
@@ -57,11 +58,11 @@ class Controller:
         self._group_names = self._robot.get_group_names()
 
         #camera feed
-        self.camera_info_sub = message_filters.Subscriber('/camera/color/camera_info2', CameraInfo)
+        # self.camera_info_sub = message_filters.Subscriber('/camera/color/camera_info2', CameraInfo)
         self.image_sub = message_filters.Subscriber("/camera/color/image_raw2", Image)
         self.depth_sub = message_filters.Subscriber("/camera/depth/image_raw2", Image)
 
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.camera_info_sub], queue_size=10, slop=0.5)
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=10, slop=0.5)
         self.ts.registerCallback(self.image_callback)
 
         self.bridge = CvBridge()
@@ -106,24 +107,24 @@ class Controller:
             #Algorithm:
 
             if self.stage == 0:
-                # self.go_to_predefined_pose("rotate_90")
+                self.go_to_predefined_pose("rotate_90")
                 moveit_commander.roscpp_shutdown()
-                self.rotate(0, -1)
-            # if self.stage == 1:
-            #     self.orient(0.94, 1, 0.5)
-            # if self.stage == 2:
-            #     self.rotate(1.57, 1)
-            # if self.stage == 3:
-            #     self.followTroughs(1)
-            # if self.stage == 4:
-            #     self.orient(-1.57, 1.5, 1)
-            # if self.stage == 5:
-            #     self.followTroughs(1)
-            # if self.stage == 6:
-            #     self.stop()
-            #     self.pub.publish(self.velocity_msg)
-            #     rospy.loginfo("Task completed")
-            #     rospy.signal_shutdown("Task 3 finished")
+                self.rotate(3.14, 1)
+            if self.stage == 1:
+                self.orient(2.2, 0.5, -0.45)
+            if self.stage == 2:
+                self.rotate(1.57, -1)
+            if self.stage == 3:
+                self.followTroughs(1)
+            if self.stage == 4:
+                self.orient(-1.57, 1.5, -1)
+            if self.stage == 5:
+                self.followTroughs(1)
+            if self.stage == 6:
+                self.stop()
+                self.pub.publish(self.velocity_msg)
+                rospy.loginfo("Task completed")
+                rospy.signal_shutdown("Task 3 finished")
 
             self.pub.publish(self.velocity_msg)
 
@@ -139,7 +140,7 @@ class Controller:
              self._group_1.plan()
              flag_plan = self._group_1.go(wait=True)
 
-        # rospy.loginfo('\033[94m' + "Now at Pose: {}".format(arg_pose_name) + '\033[0m')
+        rospy.loginfo('\033[94m' + "Now at Pose: {}".format(arg_pose_name) + '\033[0m')
 
     def pid(self, error, const):
         prop = error
@@ -226,7 +227,7 @@ class Controller:
         self.fleft = min(min(msg.ranges[432:576]), msg.range_max)   # distance of the closest object in the front left region
         self.bleft = min(min(msg.ranges[576:720]), msg.range_max)   # distance of the closest object in the back lrft region
 
-    def image_callback(self, rgb_data, depth_data, camera_info):
+    def image_callback(self, rgb_data, depth_data):
 
         # Initializing variables
         focal_length = 554.387
@@ -259,16 +260,43 @@ class Controller:
 
                 cX = int(C['m10']/(C['m00']+1e-4))
                 cY = int(C['m01']/(C['m00']+1e-4))
+                depth = depth_frame[cY][cX]
+
+                # transforming pixel coordinates to world coordinates
+                if depth < 1:
+                    world_x = (cX - center_x)/focal_length*depth
+                    world_y = (cY - center_y)/focal_length*depth
+                    world_z = depth
+
+                    # broadcasting TF for each tomato coordinate
+                    br = tf2_ros.TransformBroadcaster()
+                    t = geometry_msgs.msg.TransformStamped()
+                    t.header.stamp = rospy.Time.now()
+                    t.header.frame_id = "camera_link2"
+                    t.child_frame_id = "obj"+str(i)
+
+                    # putting world coordinates coordinates as viewed for sjcam frame
+                    t.transform.translation.x = world_z
+                    t.transform.translation.y = -world_x
+                    t.transform.translation.z = world_y
+
+                    # not extracting any orientation thus orientation is (0, 0, 0)
+                    q = tf_conversions.transformations.quaternion_from_euler(0, 0, 0)
+                    t.transform.rotation.x = q[0]
+                    t.transform.rotation.y = q[1]
+                    t.transform.rotation.z = q[2]
+                    t.transform.rotation.w = q[3]
+
+                    br.sendTransform(t)
 
                 cv2.putText(frame, 'obj{}'.format(i),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                 cv2.circle(frame, (cX, cY), 2, (255, 255, 255), -1)
-                cv2.circle(depth_frame, (cX, cY), 2, (0, 0, 0), -1)
+                cv2.circle(depth_frame, (cX, cY), 2, (0, 255, 0), -1)
 
                 i+=1
 
-            # cv2.imshow("frame", threshold)
             cv2.imshow("frame_2", frame)
-            cv2.imshow("depth_frame", depth_frame)
+            # cv2.imshow("depth_frame", depth_frame)
             cv2.waitKey(1)
 
         except CvBridgeError as e:

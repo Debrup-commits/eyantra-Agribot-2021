@@ -2,9 +2,9 @@
 
 """
 Description: Obtaining TF of a ArUco marker using single sjcam camera
-Algorithm: 
+Algorithm:
 	Input: ROS topic for the RGB image
-	Process: 
+	Process:
         - Subscribe to the image topic
 		- Convert ROS format to OpenCV format
 		- Detecting ArUco marker along with its ID
@@ -74,14 +74,14 @@ def callback(data):
                 cX = int((topLeft[0] + bottomRight[0]) / 2.0)
                 cY = int((topLeft[1] + bottomRight[1]) / 2.0)
                 cv.circle(frame, (cX, cY), 4, (0, 0, 255), -1)
-                
+
                 pixel_width = topLeft[1] - bottomRight[1]
 
                 # draw the ArUco marker ID on the frame
                 cv.putText(frame, str(markerID),
                     (topLeft[0], topLeft[1] - 15), cv.FONT_HERSHEY_SIMPLEX,
                     0.5, (0, 255, 0), 2)
-                
+
                 '''uncomment to view aruco ID and verify the working of the code'''
                 #print("[INFO] ArUco marker ID: {}".format(markerID))
 

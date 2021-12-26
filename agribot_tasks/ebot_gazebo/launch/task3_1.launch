@@ -1,5 +1,4 @@
 <launch>
-  <include file = "$(find ur5_moveit)/launch/ur5_bringup_moveit.launch"/>
   <!--  agribot with ur5 -->
   <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find ebot_gazebo)/urdf/agri_bot.xacro'"/>
 
@@ -19,12 +18,32 @@
   <include file="$(find tomato_gazebo)/launch/tomato_static_plant.launch"/>
 
   <!-- include your manipulation launch file from agri_bot_moveit package -->
+  <include file = "$(find ur5_moveit)/launch/ur5_bringup_moveit.launch"/>
 
 
   <!-- include your tomato detection script -->
-
+  <node name = "controller_task3_1" pkg='agri_bot_perception' type='controller_task3_1.py' output="screen"/>
 
   <!-- include teleop script or task1.3 script for navigation -->
+
+  <!-- Recording group -->
+  <arg name="duration" default="300"/>
+  <arg name="rec_name" default="task3_1.bag"/>
+  <arg name="record" default="false"/>
+  <group if="$(arg record)">
+
+  <node name="state_node" pkg="topic_tools" type="throttle"
+    args="messages /gazebo/model_states 10.0"/>
+
+  <node name="link_node" pkg="topic_tools" type="throttle"
+    args="messages /gazebo/link_states 10.0"/>
+
+  <node name="task3_1_rosbag" pkg="rosbag" type="record"
+    args="record -O $(find ebot_gazebo)/bag_files/$(arg rec_name) --duration=$(arg duration)
+    /gazebo/model_states_throttle
+    /tf
+    /cmd_vel" output="screen"/>
+  </group>
 
 
 </launch>
