@@ -76,10 +76,10 @@
         <joint name="wrist_3_joint" value="0"/>
     </group_state>
     <group_state name="rotate_90_2" group="arm">
-        <joint name="elbow_joint" value="-1.0935"/>
-        <joint name="shoulder_lift_joint" value="-0.1041"/>
-        <joint name="shoulder_pan_joint" value="1.57"/>
-        <joint name="wrist_1_joint" value="1.215"/>
+        <joint name="elbow_joint" value="-0.5728"/>
+        <joint name="shoulder_lift_joint" value="-0.3124"/>
+        <joint name="shoulder_pan_joint" value="1.7009"/>
+        <joint name="wrist_1_joint" value="0.8678"/>
         <joint name="wrist_2_joint" value="0"/>
         <joint name="wrist_3_joint" value="0"/>
     </group_state>
