@@ -71,48 +71,42 @@ class Ur5Moveit:
         self.rgb_frame = None
         self.depth_frame = None
 
-        self.get_coordinates = True
+        self.bridge = CvBridge()
 
+        #synchronizes depth and rgb camera feed
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub], queue_size=10, slop=0.5)
         self.ts.registerCallback(self.image_callback)
 
+        #listens to the broadcasted tf of the tomatoes
         listener = tf.TransformListener()
 
-        self.bridge = CvBridge()
 
         while not rospy.is_shutdown():
+            #rotates arm for camera to be able to detect tomatoes to be plucked
             self.go_to_predefined_pose("rotate_90_2")
-            print("aagya")
-            coordinates = self.give_tomato_coordinates(self.rgb_frame, self.depth_frame)
-            # moveit_commander.roscpp_shutdown()
+
+            #broadcasts and returns number of tomatoes to be plucked
+            no_of_tomatoes = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
+
+            #msg to be used to give arm the info of coordinates it has to move to
             ur5_pose = geometry_msgs.msg.Pose()
             try:
-                for i, coordinate in enumerate(coordinates):
-                    trans, rot = listener.lookupTransform(target_frame='/base_link', source_frame='/obj{}'.format(i), time=rospy.Time(0))
-                    ur5_pose.position.x = trans[0]
-                    ur5_pose.position.y = trans[1]
-                    ur5_pose.position.z = trans[2]
-                    # ur5_pose.orientation.x = rot[0]
-                    # ur5_pose.orientation.y = rot[1]
-                    # ur5_pose.orientation.z = rot[2]
-                    # ur5_pose.orientation.w = rot[3]
+                for i in range(no_of_tomatoes):
+                    #gives the final converted tfs where the arm has to go
+                    trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
 
-                    print(i)
+                    #arm movement
+                    self.take_to_pose(ur5_pose, trans, 0.4)
+                    self.take_to_pose(ur5_pose, trans, 0.25)
 
-                    self.go_to_pose(ur5_pose)
                     self.go_to_predefined_pose("close")
                     self.go_to_predefined_pose("home")
                     self.go_to_predefined_pose("open")
-                    # x = input("enter password to continue")
+
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 continue
-
-            # rospy.signal_shutdown("task done")
-
-            # i=0
-            # rospy.signal_shutdown("task3_2 completed")
-            # while i < i+1:
-            #     i+=1
+            rospy.loginfo("task3_2 completed")
+            rospy.signal_shutdown("task done")
 
     def go_to_predefined_pose(self, arg_pose_name):
 
@@ -151,7 +145,18 @@ class Ur5Moveit:
 
         return flag_plan
 
-    def give_tomato_coordinates(self, rgb_frame, depth_frame):
+    def take_to_pose(self, pose_msg, trans, y_diff_factor):
+        pose_msg.position.x = trans[0]
+        pose_msg.position.y = trans[1]-y_diff_factor
+        pose_msg.position.z = trans[2]
+        pose_msg.orientation.x = 0
+        pose_msg.orientation.y = 0
+        pose_msg.orientation.z = 0
+        pose_msg.orientation.w = 1
+
+        self.go_to_pose(pose_msg)
+
+    def broadcast_tomato_coordinates(self, rgb_frame, depth_frame):
         # Initializing variables
         focal_length = 554.387
         center_x = 320.5
@@ -171,9 +176,6 @@ class Ur5Moveit:
         contours, hierarchy = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         i=0
-
-        coordinates = []
-        coordinate = []
 
         for contour in contours:
             C = cv2.moments(contour)
@@ -195,10 +197,6 @@ class Ur5Moveit:
             t.child_frame_id = "obj" + str(i)
 
             # putting world coordinates coordinates as viewed for sjcam frame
-            # t.transform.translation.x = world_z
-            # t.transform.translation.y = -world_x
-            # t.transform.translation.z = world_y
-
             t.transform.translation.x = world_x
             t.transform.translation.y = world_y
             t.transform.translation.z = world_z
@@ -212,12 +210,6 @@ class Ur5Moveit:
 
             br.sendTransform(t)
 
-            coordinate.append(world_z)
-            coordinate.append(-world_x)
-            coordinate.append(world_y)
-            coordinates.append(coordinate)
-            coordinate = []
-
             cv2.putText(rgb_frame, 'obj{}'.format(i),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
             cv2.circle(rgb_frame, (cX, cY), 2, (255, 255, 255), -1)
             cv2.circle(depth_frame, (cX, cY), 2, (0, 255, 0), -1)
@@ -227,7 +219,7 @@ class Ur5Moveit:
         cv2.imshow("frame", rgb_frame)
         cv2.waitKey(1)
 
-        return coordinates
+        return len(contours)
 
 
     def image_callback(self, rgb_data, depth_data):

@@ -21,9 +21,27 @@
     <include file = "$(find ur5_moveit)/launch/ur5_bringup_moveit.launch"/>
 
     <!-- include your tomato detection script -->
-
+    <node name = "controller_task3_2" pkg='agri_bot_perception' type='controller_task3_2.py' output="screen"/>
 
     <!-- include your ros node for manipulation -->
 
+    <!-- Recording group -->
+    <arg name="duration" default="300"/>
+    <arg name="rec_name" default="task3_2.bag"/>
+    <arg name="record" default="false"/>
+    <group if="$(arg record)">
+
+    <node name="state_node" pkg="topic_tools" type="throttle"
+      args="messages /gazebo/model_states 10.0"/>
+
+    <node name="link_node" pkg="topic_tools" type="throttle"
+      args="messages /gazebo/link_states 10.0"/>
+
+    <node name="task3_2_rosbag" pkg="rosbag" type="record"
+      args="record -O $(find ebot_gazebo)/bag_files/$(arg rec_name) --duration=$(arg duration)
+      /gazebo/model_states_throttle
+      /tf
+      /cmd_vel" output="screen"/>
+    </group>
 
 </launch>
