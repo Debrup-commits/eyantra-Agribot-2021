@@ -18,6 +18,7 @@ from sensor_msgs.msg import LaserScan
 import sys
 import tf2_ros
 import tf_conversions
+import tf
 from tf.transformations import euler_from_quaternion
 
 class Controller:
@@ -69,12 +70,15 @@ class Controller:
         self.call_counter = 0
         self.trough_count = 0
         self.tomato_count = 0
+        self.contour_count = 0
 
         self.bridge = CvBridge()
 
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.aruco_sub], queue_size = 30, slop = 0.5)
         self.ts.registerCallback(self.image_callback)
 
+        #listens to the broadcasted tf of the tomatoes
+        listener = tf.TransformListener()
 
         #Bot movement stuff
         #Parameters for laser scanning
@@ -125,14 +129,13 @@ class Controller:
                 self.rotate(0, 1)
 
             if self.stage == 1:
-                self.orient(0.77, 0.55, 0.415)
+                self.orient(0.9, 0.805, 0.51)
 
             if self.stage == 2:
                 self.rotate(1.57, 1)
 
             if self.stage == 3:
                 aruco_detected = self.detect_aruco(self.aruco_frame)
-                tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
 
                 if aruco_detected == True:
                     if self.call_counter == 0:
@@ -142,6 +145,10 @@ class Controller:
                         else:
                             rospy.loginfo("Trough_no {} reached".format(self.trough_count))
 
+                        rospy.sleep(1)
+
+                        tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
+
                         if tomato_num > 0:
                             for i in range(tomato_num):
                                 if self.trough_count < 10:
@@ -150,7 +157,25 @@ class Controller:
                                     rospy.loginfo("Obj_{} Identified at Trough_no {}".format(self.tomato_count, self.trough_count))
                                 self.tomato_count += 1
 
+                            ur5_pose = geometry_msgs.msg.Pose()
+                            try:
+                                for i in range(tomato_num):
+                                    #gives the final converted tfs where the arm has to go
+                                    trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
+
+                                    #arm movement
+                                    self.take_to_pose(ur5_pose, trans, 0.4)
+                                    self.take_to_pose(ur5_pose, trans, 0.25)
+
+                                    self.go_to_predefined_pose("close")
+                                    self.go_to_predefined_pose("home")
+                                    self.go_to_predefined_pose("open")
+
+                            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                                continue
+
                         rospy.sleep(2)
+
                         self.trough_count += 1
                         self.call_counter += 1
                     else:
@@ -167,10 +192,25 @@ class Controller:
 
             if self.stage == 6:
                 aruco_detected = self.detect_aruco(self.aruco_frame)
+
                 if aruco_detected == True:
                     if self.call_counter == 0:
                         self.stop()
-                        rospy.loginfo("Trough_no {} reached".format(self.trough_count))
+                        if self.trough_count < 10:
+                            rospy.loginfo("Trough_no 0{} reached".format(self.trough_count))
+                        else:
+                            rospy.loginfo("Trough_no {} reached".format(self.trough_count))
+
+                        tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
+
+                        if tomato_num > 0:
+                            for i in range(tomato_num):
+                                if self.trough_count < 10:
+                                    rospy.loginfo("Obj_{} Identified at Trough_no 0{}".format(self.tomato_count, self.trough_count))
+                                else:
+                                    rospy.loginfo("Obj_{} Identified at Trough_no {}".format(self.tomato_count, self.trough_count))
+                                self.tomato_count += 1
+
                         rospy.sleep(2)
                         self.trough_count += 1
                         self.call_counter += 1
@@ -198,6 +238,30 @@ class Controller:
              self._group_1.set_named_target(arg_pose_name)
              self._group_1.plan()
              flag_plan = self._group_1.go(wait=True)
+
+    def go_to_pose(self, arg_pose):
+
+        pose_values = self._group_1.get_current_pose().pose
+
+        self._group_1.set_pose_target(arg_pose)
+        flag_plan = self._group_1.go(wait=True)  # wait=False for Async Move
+
+        pose_values = self._group_1.get_current_pose().pose
+
+        list_joint_values = self._group_1.get_current_joint_values()
+
+        return flag_plan
+
+    def take_to_pose(self, pose_msg, trans, y_diff_factor):
+        pose_msg.position.x = trans[0]
+        pose_msg.position.y = trans[1]-y_diff_factor
+        pose_msg.position.z = trans[2]
+        pose_msg.orientation.x = 0
+        pose_msg.orientation.y = 0
+        pose_msg.orientation.z = 0
+        pose_msg.orientation.w = 1
+
+        self.go_to_pose(pose_msg)
 
     def pid(self, error, const):
         prop = error
@@ -233,7 +297,6 @@ class Controller:
             self.velocity_msg.angular.z = ang_vel
         else:
             self.stop()
-            # print("Target orientation achieved!")
             self.stage += 1
 
     def orient(self, final_orientation, linear_vel, angular_vel):
@@ -241,10 +304,8 @@ class Controller:
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
 
-            # print("Orienting...current orientation: ", self.theta)
         else:
             self.stop()
-            # print("Target orientation achieved!")
             self.stage += 1
 
     def followTroughs(self, linear_vel):
@@ -255,16 +316,12 @@ class Controller:
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
 
-            # print("Following troughs...distance from trough row: ", self.bright)
-
         if self.bleft < 1 and self.bright > 1:
             error = 0.45-self.bleft
             angular_vel = self.pid(error, self.params)
 
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = -angular_vel
-
-            # print("Following troughs...distance from trough row: ", self.bleft)
 
         if self.bleft < 1 and self.bright < 1:
 
@@ -273,8 +330,6 @@ class Controller:
 
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
-
-            # print("Troughs on both sides...distance from left & right row respectively: ", self.bleft, self.bright)
 
         if self.bleft > 1 and self.bright > 1:
             self.stop()
@@ -288,7 +343,7 @@ class Controller:
         w = data.pose.pose.orientation.w;
 
         self.x = data.pose.pose.position.x # x coordinate of bot
-        self.y = data.pose.pose.position.y # y coordinnate of bot
+        self.y = data.pose.pose.position.y # y coordinate of bot
         self.theta = euler_from_quaternion([x,y,z,w])[2] #real time orientation of bot
 
     def laser_callback(self, msg):
@@ -381,17 +436,14 @@ class Controller:
 
                 br.sendTransform(t)
 
-                cv2.putText(rgb_frame, 'obj{}'.format(i),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                cv2.putText(rgb_frame, 'obj{}'.format(self.tomato_count),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                 cv2.circle(rgb_frame, (cX, cY), 2, (255, 255, 255), -1)
                 cv2.circle(depth_frame, (cX, cY), 2, (0, 255, 0), -1)
 
                 i += 1
 
-            else:
-                continue
-
-        # cv2.imshow("rgb_frame", self.rgb_frame)
-        cv2.waitKey(1)
+        if cv2.waitKey(27) & 0xFF == ord('q'):
+            rospy.signal_shutdown('user command')
 
         return i
 
