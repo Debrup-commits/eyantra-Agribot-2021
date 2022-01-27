@@ -71,6 +71,8 @@ class Controller:
         self.trough_count = 0
         self.tomato_count = 0
         self.contour_count = 0
+        self.trough_traversal_count = 0
+        self.identification_count = 0
 
         self.bridge = CvBridge()
 
@@ -118,18 +120,19 @@ class Controller:
         while not rospy.is_shutdown():
 
             #Algorithm:
+            ur5_pose = geometry_msgs.msg.Pose()
 
             if self.stage == -1:
                 rospy.loginfo("Started Run!")
                 self.go_to_predefined_pose("rotate_90_2")
-                moveit_commander.roscpp_shutdown()
+                # moveit_commander.roscpp_shutdown()
                 self.stage += 1
 
             if self.stage == 0:
                 self.rotate(0, 1)
 
             if self.stage == 1:
-                self.orient(0.9, 0.805, 0.51)
+                self.orient(0.9, 0.8, 0.520015)
 
             if self.stage == 2:
                 self.rotate(1.57, 1)
@@ -140,47 +143,54 @@ class Controller:
                 if aruco_detected == True:
                     if self.call_counter == 0:
                         self.stop()
-                        if self.trough_count < 10:
-                            rospy.loginfo("Trough_no 0{} reached".format(self.trough_count))
-                        else:
-                            rospy.loginfo("Trough_no {} reached".format(self.trough_count))
+                        if self.trough_traversal_count == 0:
+                            if self.trough_count < 10:
+                                rospy.loginfo("Trough_no 0{} reached".format(self.trough_count))
+                            else:
+                                rospy.loginfo("Trough_no {} reached".format(self.trough_count))
+
+                            self.trough_traversal_count += 1
 
                         rospy.sleep(1)
 
                         tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
 
                         if tomato_num > 0:
-                            for i in range(tomato_num):
-                                if self.trough_count < 10:
-                                    rospy.loginfo("Obj_{} Identified at Trough_no 0{}".format(self.tomato_count, self.trough_count))
-                                else:
-                                    rospy.loginfo("Obj_{} Identified at Trough_no {}".format(self.tomato_count, self.trough_count))
-                                self.tomato_count += 1
-
-                            ur5_pose = geometry_msgs.msg.Pose()
                             try:
                                 for i in range(tomato_num):
+                                    if self.identification_count == 0:
+                                        if self.trough_count < 10:
+                                            rospy.loginfo("Obj_{} Identified at Trough_no 0{}".format(self.tomato_count, self.trough_count))
+                                        else:
+                                            rospy.loginfo("Obj_{} Identified at Trough_no {}".format(self.tomato_count, self.trough_count))
+
+                                        self.identification_count += 1
+
                                     #gives the final converted tfs where the arm has to go
                                     trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
-
                                     #arm movement
                                     self.take_to_pose(ur5_pose, trans, 0.4)
                                     self.take_to_pose(ur5_pose, trans, 0.25)
 
                                     self.go_to_predefined_pose("close")
+                                    rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
                                     self.go_to_predefined_pose("home")
                                     self.go_to_predefined_pose("open")
+                                    rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
+                                    self.go_to_predefined_pose("rotate_90_2")
+
+                                    self.tomato_count += 1
+                                    self.identification_count = 0
 
                             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                                 continue
-
-                        rospy.sleep(2)
 
                         self.trough_count += 1
                         self.call_counter += 1
                     else:
                         self.followTroughs(0.5)
                 else:
+                    self.trough_traversal_count = 0
                     self.call_counter = 0
                     self.followTroughs(0.5)
 
@@ -196,27 +206,54 @@ class Controller:
                 if aruco_detected == True:
                     if self.call_counter == 0:
                         self.stop()
-                        if self.trough_count < 10:
-                            rospy.loginfo("Trough_no 0{} reached".format(self.trough_count))
-                        else:
-                            rospy.loginfo("Trough_no {} reached".format(self.trough_count))
+                        if self.trough_traversal_count == 0:
+                            if self.trough_count < 10:
+                                rospy.loginfo("Trough_no 0{} reached".format(self.trough_count))
+                            else:
+                                rospy.loginfo("Trough_no {} reached".format(self.trough_count))
+
+                            self.trough_traversal_count += 1
+
+                        rospy.sleep(1)
 
                         tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
 
                         if tomato_num > 0:
-                            for i in range(tomato_num):
-                                if self.trough_count < 10:
-                                    rospy.loginfo("Obj_{} Identified at Trough_no 0{}".format(self.tomato_count, self.trough_count))
-                                else:
-                                    rospy.loginfo("Obj_{} Identified at Trough_no {}".format(self.tomato_count, self.trough_count))
-                                self.tomato_count += 1
+                            try:
+                                for i in range(tomato_num):
+                                    if self.identification_count == 0:
+                                        if self.trough_count < 10:
+                                            rospy.loginfo("Obj_{} Identified at Trough_no 0{}".format(self.tomato_count, self.trough_count))
+                                        else:
+                                            rospy.loginfo("Obj_{} Identified at Trough_no {}".format(self.tomato_count, self.trough_count))
 
-                        rospy.sleep(2)
+                                        self.identification_count += 1
+
+                                    #gives the final converted tfs where the arm has to go
+                                    trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
+                                    #arm movement
+                                    self.take_to_pose(ur5_pose, trans, 0.4)
+                                    self.take_to_pose(ur5_pose, trans, 0.25)
+
+                                    self.go_to_predefined_pose("close")
+                                    rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
+                                    self.go_to_predefined_pose("home")
+                                    self.go_to_predefined_pose("open")
+                                    rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
+                                    self.go_to_predefined_pose("rotate_90_2")
+
+                                    self.tomato_count += 1
+                                    self.identification_count = 0
+
+                            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                                continue
+
                         self.trough_count += 1
                         self.call_counter += 1
                     else:
                         self.followTroughs(0.5)
                 else:
+                    self.trough_traversal_count = 0
                     self.call_counter = 0
                     self.followTroughs(0.5)
 
@@ -297,6 +334,7 @@ class Controller:
             self.velocity_msg.angular.z = ang_vel
         else:
             self.stop()
+            rospy.sleep(1)
             self.stage += 1
 
     def orient(self, final_orientation, linear_vel, angular_vel):
