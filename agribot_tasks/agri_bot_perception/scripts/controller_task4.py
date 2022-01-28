@@ -73,6 +73,8 @@ class Controller:
         self.contour_count = 0
         self.trough_traversal_count = 0
         self.identification_count = 0
+        self.pose_status = None
+        self.missed_tomatoes = []
 
         self.bridge = CvBridge()
 
@@ -100,7 +102,7 @@ class Controller:
 
         #PID Parameters
         self.intg, self.last_error = 0.0, 0.0
-        self.params = {'KP': 2, 'KD': 1, 'KI': 0}
+        self.params = {'KP': 8, 'KD': 4, 'KI': 0}
 
         #Publisher
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
@@ -125,14 +127,13 @@ class Controller:
             if self.stage == -1:
                 rospy.loginfo("Started Run!")
                 self.go_to_predefined_pose("rotate_90_2")
-                # moveit_commander.roscpp_shutdown()
                 self.stage += 1
 
             if self.stage == 0:
                 self.rotate(0, 1)
 
             if self.stage == 1:
-                self.orient(0.9, 0.8, 0.520015)
+                self.orient(0.9, 0.8, 0.53)
 
             if self.stage == 2:
                 self.rotate(1.57, 1)
@@ -170,15 +171,18 @@ class Controller:
                                     trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
                                     #arm movement
                                     self.take_to_pose(ur5_pose, trans, 0.4)
-                                    self.take_to_pose(ur5_pose, trans, 0.25)
+                                    self.take_to_pose(ur5_pose, trans, 0.27)
+                                    # print(self.pose_status, ur5_pose.position.y)
+                                    if abs(self.pose_status-ur5_pose.position.y)<0.01:
+                                        self.go_to_predefined_pose("close")
+                                        rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
+                                        self.go_to_predefined_pose("home")
+                                        self.go_to_predefined_pose("open")
+                                        rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
 
-                                    self.go_to_predefined_pose("close")
-                                    rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
-                                    self.go_to_predefined_pose("home")
-                                    self.go_to_predefined_pose("open")
-                                    rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
+                                    else:
+                                        self.missed_tomatoes.append([self.tomato_count, self.trough_count])
                                     self.go_to_predefined_pose("rotate_90_2")
-
                                     self.tomato_count += 1
                                     self.identification_count = 0
 
@@ -233,7 +237,7 @@ class Controller:
                                     trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
                                     #arm movement
                                     self.take_to_pose(ur5_pose, trans, 0.4)
-                                    self.take_to_pose(ur5_pose, trans, 0.25)
+                                    self.take_to_pose(ur5_pose, trans, 0.27)
 
                                     self.go_to_predefined_pose("close")
                                     rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
@@ -258,6 +262,58 @@ class Controller:
                     self.followTroughs(0.5)
 
             if self.stage == 7:
+                self.trough_count = 0
+                self.orient(-0.8, 0.5, 0.85)
+            if self.stage == 8:
+                self.rotate(0, 1)
+            if self.stage == 9:
+                self.orient(0.9, 1.3, 1.7)
+            if self.stage == 10:
+                self.rotate(1.57, 1)
+
+            if self.stage == 11:
+                self.go_to_predefined_pose("rotate_90")
+                aruco_detected = self.detect_aruco(self.aruco_frame)
+                if aruco_detected == True:
+                    if self.call_counter == 0:
+                        self.stop()
+
+                        rospy.sleep(1)
+
+                        tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
+
+                        if tomato_num > 0:
+                            try:
+                                for i in range(tomato_num):
+                                    #gives the final converted tfs where the arm has to go
+                                    trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
+                                    #arm movement
+                                    self.take_to_pose(ur5_pose, trans, 0.4)
+                                    self.take_to_pose(ur5_pose, trans, 0.27)
+
+                                    if abs(self.pose_status-ur5_pose.position.y)<0.01:
+                                        self.go_to_predefined_pose("close")
+                                        rospy.loginfo("Obj_{} Picked".format(self.missed_tomatoes[0][0]))
+                                        self.go_to_predefined_pose("home")
+                                        self.go_to_predefined_pose("open")
+                                        rospy.loginfo("Obj_{} Dropped in front basket".format(self.missed_tomatoes[0][0]))
+                                        self.missed_tomatoes.pop(0)
+                                        self.go_to_predefined_pose("rotate_90")
+
+                                    self.tomato_count += 1
+                                    self.identification_count = 0
+
+                            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                                continue
+
+                        self.call_counter += 1
+                    else:
+                        self.followTroughs(0.5)
+                else:
+                    self.call_counter = 0
+                    self.followTroughs(0.5)
+
+            if self.stage == 12:
                 self.stop()
                 self.pub.publish(self.velocity_msg)
                 rospy.loginfo("Mission Accomplished!")
@@ -284,6 +340,8 @@ class Controller:
         flag_plan = self._group_1.go(wait=True)  # wait=False for Async Move
 
         pose_values = self._group_1.get_current_pose().pose
+
+        self.pose_status = pose_values.position.y
 
         list_joint_values = self._group_1.get_current_joint_values()
 
@@ -334,7 +392,7 @@ class Controller:
             self.velocity_msg.angular.z = ang_vel
         else:
             self.stop()
-            rospy.sleep(1)
+            rospy.sleep(0.5)
             self.stage += 1
 
     def orient(self, final_orientation, linear_vel, angular_vel):

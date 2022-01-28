@@ -40,9 +40,9 @@ class Controller:
                 cX = int(C['m10']/(C['m00']+1e-4))
                 cY = int(C['m01']/(C['m00']+1e-4))
 
-                cv2.putText(frame, 'obj{}'.format(i),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                cv2.putText(frame, 'obj{}'.format(i),(cX, cY-50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
                 cv2.circle(frame, (cX, cY), 2, (255, 255, 255), -1)
-
+                frame = cv2.rectangle(frame, (cX-30, cY-25), (cX+30, cY+25), (0, 255, 0), 2)
                 i += 1
 
             cv2.imshow("camera_feed", frame)
