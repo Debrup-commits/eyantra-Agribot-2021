@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-#This script is responsible for the state wise maneuvering, coordinate broadcasting and arm manipulation of the Bot
-
 import actionlib
 import copy
 import cv2
@@ -69,8 +67,6 @@ class Controller:
         self.rgb_frame = None
         self.depth_frame = None
         self.aruco_frame = None
-
-        #some flags
         self.call_counter = 0
         self.trough_count = 0
         self.tomato_count = 0
@@ -78,6 +74,7 @@ class Controller:
         self.trough_traversal_count = 0
         self.identification_count = 0
         self.pose_status = None
+        self.missed_tomatoes = []
 
         self.bridge = CvBridge()
 
@@ -142,7 +139,6 @@ class Controller:
                 self.rotate(1.57, 1)
 
             if self.stage == 3:
-                #detects aruco markers
                 aruco_detected = self.detect_aruco(self.aruco_frame)
 
                 if aruco_detected == True:
@@ -158,7 +154,6 @@ class Controller:
 
                         rospy.sleep(1)
 
-                        #broadcasts the tomatoes detected under depth 1 metre and returns number of such tomatoes available
                         tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
 
                         if tomato_num > 0:
@@ -174,12 +169,10 @@ class Controller:
 
                                     #gives the final converted tfs where the arm has to go
                                     trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
-
                                     #arm movement
                                     self.take_to_pose(ur5_pose, trans, 0.4)
                                     self.take_to_pose(ur5_pose, trans, 0.27)
-
-                                    #collection of the tomatos
+                                    # print(self.pose_status, ur5_pose.position.y)
                                     if abs(self.pose_status-ur5_pose.position.y)<0.01:
                                         self.go_to_predefined_pose("close")
                                         rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
@@ -187,6 +180,8 @@ class Controller:
                                         self.go_to_predefined_pose("open")
                                         rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
 
+                                    else:
+                                        self.missed_tomatoes.append([self.tomato_count, self.trough_count])
                                     self.go_to_predefined_pose("rotate_90_2")
                                     self.tomato_count += 1
                                     self.identification_count = 0
@@ -210,7 +205,6 @@ class Controller:
                 self.rotate(-1.57, 1)
 
             if self.stage == 6:
-                #detects aruco markers
                 aruco_detected = self.detect_aruco(self.aruco_frame)
 
                 if aruco_detected == True:
@@ -226,7 +220,6 @@ class Controller:
 
                         rospy.sleep(1)
 
-                        #broadcasts the tomatoes detected under depth 1 metre and returns number of such tomatoes available
                         tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
 
                         if tomato_num > 0:
@@ -242,20 +235,17 @@ class Controller:
 
                                     #gives the final converted tfs where the arm has to go
                                     trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
-
                                     #arm movement
                                     self.take_to_pose(ur5_pose, trans, 0.4)
                                     self.take_to_pose(ur5_pose, trans, 0.27)
 
-                                    #collection of the tomatos
-                                    if abs(self.pose_status-ur5_pose.position.y)<0.01:
-                                        self.go_to_predefined_pose("close")
-                                        rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
-                                        self.go_to_predefined_pose("home")
-                                        self.go_to_predefined_pose("open")
-                                        rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
-
+                                    self.go_to_predefined_pose("close")
+                                    rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
+                                    self.go_to_predefined_pose("home")
+                                    self.go_to_predefined_pose("open")
+                                    rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
                                     self.go_to_predefined_pose("rotate_90_2")
+
                                     self.tomato_count += 1
                                     self.identification_count = 0
 
@@ -272,6 +262,58 @@ class Controller:
                     self.followTroughs(0.5)
 
             if self.stage == 7:
+                self.trough_count = 0
+                self.orient(-0.8, 0.5, 0.85)
+            if self.stage == 8:
+                self.rotate(0, 1)
+            if self.stage == 9:
+                self.orient(0.9, 1.3, 1.7)
+            if self.stage == 10:
+                self.rotate(1.57, 1)
+
+            if self.stage == 11:
+                self.go_to_predefined_pose("rotate_90")
+                aruco_detected = self.detect_aruco(self.aruco_frame)
+                if aruco_detected == True:
+                    if self.call_counter == 0:
+                        self.stop()
+
+                        rospy.sleep(1)
+
+                        tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
+
+                        if tomato_num > 0:
+                            try:
+                                for i in range(tomato_num):
+                                    #gives the final converted tfs where the arm has to go
+                                    trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
+                                    #arm movement
+                                    self.take_to_pose(ur5_pose, trans, 0.4)
+                                    self.take_to_pose(ur5_pose, trans, 0.27)
+
+                                    if abs(self.pose_status-ur5_pose.position.y)<0.01:
+                                        self.go_to_predefined_pose("close")
+                                        rospy.loginfo("Obj_{} Picked".format(self.missed_tomatoes[0][0]))
+                                        self.go_to_predefined_pose("home")
+                                        self.go_to_predefined_pose("open")
+                                        rospy.loginfo("Obj_{} Dropped in front basket".format(self.missed_tomatoes[0][0]))
+                                        self.missed_tomatoes.pop(0)
+                                        self.go_to_predefined_pose("rotate_90")
+
+                                    self.tomato_count += 1
+                                    self.identification_count = 0
+
+                            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                                continue
+
+                        self.call_counter += 1
+                    else:
+                        self.followTroughs(0.5)
+                else:
+                    self.call_counter = 0
+                    self.followTroughs(0.5)
+
+            if self.stage == 12:
                 self.stop()
                 self.pub.publish(self.velocity_msg)
                 rospy.loginfo("Mission Accomplished!")
@@ -281,7 +323,6 @@ class Controller:
 
     def go_to_predefined_pose(self, arg_pose_name):
 
-        #takes arm to a predefined pose
         if arg_pose_name == "open" or arg_pose_name == "close":
             self._group_2.set_named_target(arg_pose_name)
             self._group_2.plan()
@@ -293,7 +334,6 @@ class Controller:
 
     def go_to_pose(self, arg_pose):
 
-        #takes arm to a given coordinate
         pose_values = self._group_1.get_current_pose().pose
 
         self._group_1.set_pose_target(arg_pose)
@@ -319,8 +359,6 @@ class Controller:
         self.go_to_pose(pose_msg)
 
     def pid(self, error, const):
-
-        #controller responsible for maintaing uniform distance from the troughs
         prop = error
         self.intg = error + self.intg
         diff = error - self.last_error
@@ -367,8 +405,6 @@ class Controller:
             self.stage += 1
 
     def followTroughs(self, linear_vel):
-
-        #uses pid and info from LIDAR to move the bot
         if self.bright < 1 and self.bleft > 1:
             error = 0.45-self.bright
             angular_vel = self.pid(error, self.params)

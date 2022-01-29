@@ -1,0 +1,15 @@
+
+Our approach can be broken down into three main parts involves maneuvering the Agribot, perception , pick and place :
+
+Maneuvering:
+
+We use a finite state machine (dividing entire path into multiple stages) approach to maneuver the AgriBot in the greenhouse.The AgriBot maneuvers the greenhouse near each trough by the help of readings from its LIDAR sensors . We have implemented PID(Proportional Integral Derivate) controller for smooth traversal of the bot in the greenhouse by maintaining certain minimum distance from the troughs to avoid collisions with the tomato plants. At the beginning we start by setting the UR5 arm to rotate towards the trough , once the gripper faces trough, we start driving the bot forward along the troughs.
+
+Perception:
+
+By the sjcam situated near to the bot's base it detects the aruco markers and stops at that point . Once it stops there , it searches for red tomatoes in the frame of the camera attached to the gripper by using Image thresholding and identifies the centroids of each red tomato and broadcasts its coordinates using tf2 library if its corresponding depth is within the arm's(ur5) reach. The position of the tomato is found with regard to the ebot base by using lookupTransform.
+
+Pick and place:
+
+Once the coordinates of the tomato are broadcasted and transformed, we call "take_to_pose" function that calls the "go_to_pose" function which takes the target coordinates in the form of the Odometry msg type as input to plan the path of the arm and consequently execute the picking of the red tomato and dropping it to the basket after dropping , the arm again is sent to face the troughs by using the "go_to_predefined_pose" function . This is repeated for every tomato in the frame once achieved , the AgriBot again follows the Trough to go to the next trough.
+

@@ -30,7 +30,8 @@
 
 
 <!-- include your perception pipeline -->
-
+    <!-- <node name = "task4_ip" pkg='agri_bot_perception' type='task4_ip.py' output="screen"/> -->
+    <!-- <node name = "controller_task4" pkg='agri_bot_perception' type='controller_task4.py' output="screen"/> -->
 
 
 </launch>
