@@ -45,6 +45,7 @@ class Controller:
         self._display_trajectory_publisher = rospy.Publisher(
             '/move_group/display_planned_path', moveit_msgs.msg.DisplayTrajectory, queue_size=1)
 
+        #action server
         self._exectute_trajectory_client = actionlib.SimpleActionClient(
             'execute_trajectory', moveit_msgs.msg.ExecuteTrajectoryAction)
         self._exectute_trajectory_client.wait_for_server()
@@ -61,7 +62,6 @@ class Controller:
         self._group_names = self._robot.get_group_names()
 
         #camera feed
-        # self.camera_info_sub = message_filters.Subscriber('/camera/color/camera_info2', CameraInfo)
         self.image_sub = message_filters.Subscriber("/camera/color/image_raw2", Image)
         self.depth_sub = message_filters.Subscriber("/camera/depth/image_raw2", Image)
         self.aruco_sub = message_filters.Subscriber("/ebot/camera1/image_raw", Image)
@@ -79,8 +79,12 @@ class Controller:
         self.identification_count = 0
         self.pose_status = None
 
+        #array to store info about missed tomatoes
+        self.missed_tomatoes = []
+
         self.bridge = CvBridge()
 
+        #Time synchronizer to work with multiple camera topics
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.aruco_sub], queue_size = 30, slop = 0.5)
         self.ts.registerCallback(self.image_callback)
 
@@ -113,9 +117,6 @@ class Controller:
         #Subscribers
         rospy.Subscriber('/ebot/laser/scan', LaserScan, self.laser_callback)
         rospy.Subscriber('/odom', Odometry, self.odom_callback)
-
-        #Rate of publishing
-        self.rate = rospy.Rate(10)
 
         #ROS msg
         self.velocity_msg = Twist()
@@ -180,12 +181,16 @@ class Controller:
                                     self.take_to_pose(ur5_pose, trans, 0.27)
 
                                     #collection of the tomatos
+                                    #attempts to pick only if current state of the arm is roughly the same as the pose of the tomato to be picked
                                     if abs(self.pose_status-ur5_pose.position.y)<0.01:
                                         self.go_to_predefined_pose("close")
                                         rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
                                         self.go_to_predefined_pose("home")
                                         self.go_to_predefined_pose("open")
                                         rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
+                                    else:
+                                        #In case of a miss, relevant info regarding the missed tomato is noted
+                                        self.missed_tomatoes.append([self.tomato_count, self.trough_count])
 
                                     self.go_to_predefined_pose("rotate_90_2")
                                     self.tomato_count += 1
@@ -204,12 +209,18 @@ class Controller:
                     self.followTroughs(0.5)
 
             if self.stage == 4:
-                self.orient(-1.85, 0.5, 0.78)
+                self.orient(2.45, 0.5, 0.85)
 
             if self.stage == 5:
-                self.rotate(-1.57, 1)
+                self.rotate(3.14, 1)
 
             if self.stage == 6:
+                self.orient(-2, 0.6, 1.1)
+
+            if self.stage == 7:
+                self.rotate(-1.57, 1)
+
+            if self.stage == 8:
                 #detects aruco markers
                 aruco_detected = self.detect_aruco(self.aruco_frame)
 
@@ -224,6 +235,76 @@ class Controller:
 
                             self.trough_traversal_count += 1
 
+                        rospy.sleep(1)
+
+                        #broadcasts the tomatoes detected under depth 1 metre and returns number of such tomatoes available
+                        tomato_num = self.broadcast_tomato_coordinates(self.rgb_frame, self.depth_frame)
+
+                        if tomato_num > 0:
+                            try:
+                                for i in range(tomato_num):
+                                    #gives the final converted tfs where the arm has to go
+                                    trans, rot = listener.lookupTransform(target_frame='/ebot_base', source_frame='/obj0', time=rospy.Time(0))
+
+                                    #arm movement
+                                    self.take_to_pose(ur5_pose, trans, 0.4)
+                                    self.take_to_pose(ur5_pose, trans, 0.27)
+
+                                    #collection of the missed tomatos
+                                    if abs(self.pose_status-ur5_pose.position.y)<0.01:
+                                        self.go_to_predefined_pose("close")
+                                        rospy.loginfo("Obj_{} Picked".format(self.missed_tomatoes[0][0]))
+                                        self.go_to_predefined_pose("home")
+                                        self.go_to_predefined_pose("open")
+                                        rospy.loginfo("Obj_{} Dropped in front basket".format(self.missed_tomatoes[0][0]))
+
+                                        #if the tomato is picked, its corresponding info is popped out of the list
+                                        self.missed_tomatoes.pop(0)
+
+                                    self.go_to_predefined_pose("rotate_90_2")
+
+                            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                                continue
+
+                        self.trough_count += 1
+                        self.call_counter += 1
+                    else:
+                        self.followTroughs(0.5)
+                else:
+                    self.trough_traversal_count = 0
+                    self.call_counter = 0
+                    self.followTroughs(0.5)
+
+            if self.stage == 9:
+                self.rotate(0, 1)
+
+            if self.stage == 10:
+                self.rotate(1.57, 1)
+
+            if self.stage == 11:
+                self.followTroughs(1)
+
+            if self.stage == 12:
+                self.orient(2.55, 0.5, 1)
+
+            if self.stage == 13:
+                self.rotate(3.14, 1)
+
+            if self.stage == 14:
+                self.orient(-2.15, 0.6, 1.1)
+
+            if self.stage == 15:
+                #since the bot goes back to collect tomatoesfrom the other troughs, its trough track needs to be updated
+                self.trough_count = 10
+                self.rotate(-1.57, 1)
+
+            if self.stage == 16:
+                #detects aruco markers
+                aruco_detected = self.detect_aruco(self.aruco_frame)
+
+                if aruco_detected == True:
+                    if self.call_counter == 0:
+                        self.stop()
                         rospy.sleep(1)
 
                         #broadcasts the tomatoes detected under depth 1 metre and returns number of such tomatoes available
@@ -248,12 +329,16 @@ class Controller:
                                     self.take_to_pose(ur5_pose, trans, 0.27)
 
                                     #collection of the tomatos
+                                    #attempts to pick only if current state of the arm is roughly the same as the pose of the tomato to be picked
                                     if abs(self.pose_status-ur5_pose.position.y)<0.01:
                                         self.go_to_predefined_pose("close")
                                         rospy.loginfo("Obj_{} Picked".format(self.tomato_count))
                                         self.go_to_predefined_pose("home")
                                         self.go_to_predefined_pose("open")
                                         rospy.loginfo("Obj_{} Dropped in front basket".format(self.tomato_count))
+                                    else:
+                                        #In case of a miss, relevant info regarding the missed tomato is noted
+                                        self.missed_tomatoes.append([self.tomato_count, self.trough_count])
 
                                     self.go_to_predefined_pose("rotate_90_2")
                                     self.tomato_count += 1
@@ -267,11 +352,11 @@ class Controller:
                     else:
                         self.followTroughs(0.5)
                 else:
-                    self.trough_traversal_count = 0
                     self.call_counter = 0
                     self.followTroughs(0.5)
 
-            if self.stage == 7:
+            if self.stage == 17:
+                #Stops the agribot and terminates the task
                 self.stop()
                 self.pub.publish(self.velocity_msg)
                 rospy.loginfo("Mission Accomplished!")
@@ -280,12 +365,14 @@ class Controller:
             self.pub.publish(self.velocity_msg)
 
     def go_to_predefined_pose(self, arg_pose_name):
-
         #takes arm to a predefined pose
+
+        #Moves the cups
         if arg_pose_name == "open" or arg_pose_name == "close":
             self._group_2.set_named_target(arg_pose_name)
             self._group_2.plan()
             flag_plan = self._group_2.go(wait=True)
+        #Moves the arm
         else:
              self._group_1.set_named_target(arg_pose_name)
              self._group_1.plan()
@@ -329,11 +416,13 @@ class Controller:
         return balance
 
     def stop(self):
+        #Function to halt the bot wherever its called
         self.velocity_msg.linear.x = 0
         self.velocity_msg.angular.z = 0
         self.pub.publish(self.velocity_msg)
 
     def rotate(self, final_orientation, angular_vel):
+        #Rotates the agribot
         self.velocity_msg.linear.x = 0
         error = final_orientation - self.theta
         abs_angle_diff = abs(abs(final_orientation)-abs(self.theta))
@@ -358,17 +447,17 @@ class Controller:
             self.stage += 1
 
     def orient(self, final_orientation, linear_vel, angular_vel):
+        #Provides the bot with a constant linear and angular velocity to help it orient along a given orientation
         if abs(self.theta - final_orientation) > 0.1:
             self.velocity_msg.linear.x = linear_vel
             self.velocity_msg.angular.z = angular_vel
-
         else:
             self.stop()
             self.stage += 1
 
     def followTroughs(self, linear_vel):
-
         #uses pid and info from LIDAR to move the bot
+
         if self.bright < 1 and self.bleft > 1:
             error = 0.45-self.bright
             angular_vel = self.pid(error, self.params)
@@ -384,7 +473,6 @@ class Controller:
             self.velocity_msg.angular.z = -angular_vel
 
         if self.bleft < 1 and self.bright < 1:
-
             error = self.bleft-self.bright
             angular_vel = self.pid(error, self.params)
 
@@ -393,7 +481,8 @@ class Controller:
 
         if self.bleft > 1 and self.bright > 1:
             self.stop()
-            if self.stage < 8:
+            rospy.sleep(0.5)
+            if self.stage < 17:
                 self.stage += 1
 
     def odom_callback(self, data):
@@ -426,6 +515,8 @@ class Controller:
             print(e)
 
     def detect_aruco(self, aruco_frame):
+        #This function detects the presence of aruco markers in the sjcam feed and returns a boolean flag(True/False)
+
         # load the dictionary that was used to generate the markers
         dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_7X7_1000)
 
@@ -441,11 +532,14 @@ class Controller:
             return False
 
     def broadcast_tomato_coordinates(self, rgb_frame, depth_frame):
+        #This function detects red tomatoes and if within 1 m distance, their tfs are broadcasted
+
         # Initializing variables
         focal_length = 554.387
         center_x = 320.5
         center_y = 240.5
 
+        #Image masking and thresholding
         img_HSV = cv2.cvtColor(rgb_frame, cv2.COLOR_BGR2HSV)
 
         low_HSV = np.array([0, 53, 137])
@@ -457,6 +551,7 @@ class Controller:
 
         ret, threshold = cv2.threshold(output, 25, 255, cv2.THRESH_BINARY)
 
+        #Contour detection
         contours, hierarchy = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         i=0
@@ -464,6 +559,7 @@ class Controller:
         for contour in contours:
             C = cv2.moments(contour)
 
+            #centroid calculation
             cX = int(C['m10']/(C['m00']+1e-4))
             cY = int(C['m01']/(C['m00']+1e-4))
             depth = depth_frame[cY][cX]
@@ -496,15 +592,12 @@ class Controller:
 
                 br.sendTransform(t)
 
-                cv2.putText(rgb_frame, 'obj{}'.format(self.tomato_count),(cX, cY-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-                cv2.circle(rgb_frame, (cX, cY), 2, (255, 255, 255), -1)
-                cv2.circle(depth_frame, (cX, cY), 2, (0, 255, 0), -1)
-
                 i += 1
 
         if cv2.waitKey(27) & 0xFF == ord('q'):
             rospy.signal_shutdown('user command')
 
+        #i = No.of tomatoes whose tfs are broadcasted
         return i
 
 
