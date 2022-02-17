@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """
 Description: Obtaining TF of a ArUco marker using single sjcam camera
