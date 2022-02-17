@@ -1,15 +1,43 @@
-# eyantra-Agribot-2021
-The Flagship robotics competition of IIT Bombay
+# eYantra-Agribot-2021
+# The Flagship robotics competition of IIT Bombay
 
-Task 1 YT Link : https://youtu.be/NMDbmu7HDXc
+Objective : To develop an Agricultural Robot capable of moving around an arena of tomato plants and pluck ripe tomatoes autonomously. 
 
-Task 2 YT Link : https://youtu.be/x31KX7DiOsY
+Task 1:
 
-Task 3_A YT Link : https://youtu.be/-JeACUp6CAc
+  Objective:
+  
+    To maneuver the AgriBot around the arena.
+    
+  YT Link : https://youtu.be/NMDbmu7HDXc
 
-Task 3_B YT Link : https://youtu.be/En5Uz067cSI
+Task 2:
 
-Task 4 YT Link(Theme_implementation_1) : https://youtu.be/dmsCcZ3W6ZQ
+  Objective:
+  
+    To pluck tomatoes(via manual input) using the ur5 arm
+    
+  YT Link : https://youtu.be/x31KX7DiOsY
 
-Task 5 YT Link(Theme_implementation_2) : https://youtu.be/4AgPaSa1dK8
+Task 3_A:
+
+  Objective:
+  
+    To move around the arena and publish the transformations(tfs) of the tomatoes to be plucked
+    
+  YT Link : https://youtu.be/-JeACUp6CAc
+
+Task 3_B:
+
+  Objective:
+  
+    To pluck the ripe tomatoes autonomously using Image Prcessing and arm manipulation
+    
+  YT Link : https://youtu.be/En5Uz067cSI
+  
+  
+
+Task 4 YT Link(Theme Implementation 1) : https://youtu.be/dmsCcZ3W6ZQ
+
+Task 5 YT Link(Theme Implementation 2) : https://youtu.be/4AgPaSa1dK8
 
